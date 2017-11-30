@@ -10,6 +10,7 @@ import (
 	promconfig "github.com/prometheus/prometheus/config"
 	"github.com/rancher/go-rancher/v2"
 	"github.com/zionwu/monitoring-manager/config"
+	"github.com/zionwu/monitoring-manager/util"
 	yaml "gopkg.in/yaml.v2"
 )
 
@@ -116,6 +117,9 @@ func (s *prometheusTargetSynchronizer) Run(stopc <-chan struct{}) error {
 				logrus.Errorf("Error while writing the config to file: %s", err)
 				continue
 			}
+
+			util.ReloadConfiguration(c.PrometheusURL)
+
 		}
 	}
 
