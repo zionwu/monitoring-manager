@@ -1,74 +1,24 @@
-global:
-  scrape_interval: 15s
-  scrape_timeout: 10s
+global:                                                                         
+  scrape_interval:     15s
   evaluation_interval: 15s
-  external_labels:
-    monitor: exporter-metrics
+  external_labels:                                                              
+      monitor: 'exporter-metrics'     
+
+rule_files:
+  - "/etc/prometheus-rules/*.yaml"
 alerting:
   alertmanagers:
   - static_configs:
     - targets:
-      - alertmanager:9093
-    scheme: http
-    timeout: 10s
-rule_files:
-- /etc/prometheus-rules/*.yaml
+      - alertmanager:9093                                           
+                                                                                
 scrape_configs:
-- job_name: Cadvisor
+- job_name: 'RancherServerMetrics'
   static_configs:
-  - targets:
-    - 120.78.79.251:9101
-    labels:
-      environment: 1a18
-  - targets:
-    - 120.78.160.216:9101
-    labels:
-      environment: 1a5
-  - targets:
-    - 120.78.155.14:9101
-    labels:
-      environment: 1a38
-- job_name: NodeExporter
+    - targets:
+      - 'rancher-server:9108'
+
+- job_name: 'Prometheus'
   static_configs:
-  - targets:
-    - 120.78.79.251:9100
-    labels:
-      environment: 1a18
-  - targets:
-    - 120.78.160.216:9100
-    labels:
-      environment: 1a5
-  - targets:
-    - 120.78.155.14:9100
-    labels:
-      environment: 1a38
-- job_name: RancherHealthExporter
-  static_configs:
-  - targets:
-    - 120.78.79.251:9173
-    labels:
-      environment: 1a18
-  - targets:
-    - 120.78.160.216:9173
-    labels:
-      environment: 1a5
-  - targets:
-    - 120.78.155.14:9173
-    labels:
-      environment: 1a38
-- job_name: RancherServerMetrics
-  scrape_interval: 15s
-  scrape_timeout: 10s
-  metrics_path: /metrics
-  scheme: http
-  static_configs:
-  - targets:
-    - rancher-server:9108
-- job_name: Prometheus
-  scrape_interval: 15s
-  scrape_timeout: 10s
-  metrics_path: /metrics
-  scheme: http
-  static_configs:
-  - targets:
-    - 127.0.0.1:9090
+    - targets:
+      - '127.0.0.1:9090'

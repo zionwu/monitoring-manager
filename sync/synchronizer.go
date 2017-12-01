@@ -3,6 +3,7 @@ package sync
 import (
 	"fmt"
 	"io/ioutil"
+	"strconv"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -86,9 +87,9 @@ func (s *prometheusTargetSynchronizer) Run(stopc <-chan struct{}) error {
 					continue
 				}
 
-				addTargetToScrapeConfig(&cadvisorConfig, c.CadvisorPort, hosts, project.Id)
-				addTargetToScrapeConfig(&nodeExporterConfig, c.NodeExporterPort, hosts, project.Id)
-				addTargetToScrapeConfig(&rancherExporterConfig, c.RancherExporterPort, hosts, project.Id)
+				addTargetToScrapeConfig(&cadvisorConfig, c.CadvisorPort, hosts, project.Id, true)
+				addTargetToScrapeConfig(&nodeExporterConfig, c.NodeExporterPort, hosts, project.Id, true)
+				addTargetToScrapeConfig(&rancherExporterConfig, c.RancherExporterPort, hosts, project.Id, false)
 
 			}
 
@@ -126,7 +127,7 @@ func (s *prometheusTargetSynchronizer) Run(stopc <-chan struct{}) error {
 	return nil
 }
 
-func addTargetToScrapeConfig(scrapeConfig *promconfig.ScrapeConfig, port string, hosts *client.HostCollection, projectId string) {
+func addTargetToScrapeConfig(scrapeConfig *promconfig.ScrapeConfig, port string, hosts *client.HostCollection, projectId string, global bool) {
 
 	if scrapeConfig.ServiceDiscoveryConfig.StaticConfigs == nil {
 		scrapeConfig.ServiceDiscoveryConfig.StaticConfigs = []*promconfig.TargetGroup{}
@@ -134,10 +135,25 @@ func addTargetToScrapeConfig(scrapeConfig *promconfig.ScrapeConfig, port string,
 	tgs := scrapeConfig.ServiceDiscoveryConfig.StaticConfigs
 
 	targets := []model.LabelSet{}
+
 	for _, host := range hosts.Data {
-		target := model.LabelSet{}
-		target[model.AddressLabel] = model.LabelValue(fmt.Sprintf("%s:%s", host.AgentIpAddress, port))
-		targets = append(targets, target)
+		if global {
+			target := model.LabelSet{}
+			target[model.AddressLabel] = model.LabelValue(fmt.Sprintf("%s:%s", host.AgentIpAddress, port))
+			targets = append(targets, target)
+		} else {
+
+			for _, endpoint := range host.PublicEndpoints {
+				if strconv.FormatInt(endpoint.Port, 10) == port {
+					target := model.LabelSet{}
+					target[model.AddressLabel] = model.LabelValue(fmt.Sprintf("%s:%s", host.AgentIpAddress, port))
+					targets = append(targets, target)
+					break
+				}
+			}
+
+		}
+
 	}
 
 	labels := model.LabelSet{}
