@@ -87,9 +87,9 @@ func (s *prometheusTargetSynchronizer) Run(stopc <-chan struct{}) error {
 					continue
 				}
 
-				addTargetToScrapeConfig(&cadvisorConfig, c.CadvisorPort, hosts, project.Id, true)
-				addTargetToScrapeConfig(&nodeExporterConfig, c.NodeExporterPort, hosts, project.Id, true)
-				addTargetToScrapeConfig(&rancherExporterConfig, c.RancherExporterPort, hosts, project.Id, false)
+				addTargetToScrapeConfig(&cadvisorConfig, c.CadvisorPort, hosts, project, true)
+				addTargetToScrapeConfig(&nodeExporterConfig, c.NodeExporterPort, hosts, project, true)
+				addTargetToScrapeConfig(&rancherExporterConfig, c.RancherExporterPort, hosts, project, false)
 
 			}
 
@@ -127,7 +127,7 @@ func (s *prometheusTargetSynchronizer) Run(stopc <-chan struct{}) error {
 	return nil
 }
 
-func addTargetToScrapeConfig(scrapeConfig *promconfig.ScrapeConfig, port string, hosts *client.HostCollection, projectId string, global bool) {
+func addTargetToScrapeConfig(scrapeConfig *promconfig.ScrapeConfig, port string, hosts *client.HostCollection, project client.Project, global bool) {
 
 	if scrapeConfig.ServiceDiscoveryConfig.StaticConfigs == nil {
 		scrapeConfig.ServiceDiscoveryConfig.StaticConfigs = []*promconfig.TargetGroup{}
@@ -157,7 +157,8 @@ func addTargetToScrapeConfig(scrapeConfig *promconfig.ScrapeConfig, port string,
 	}
 
 	labels := model.LabelSet{}
-	labels[model.LabelName("environment")] = model.LabelValue(projectId)
+	labels[model.LabelName("environment_id")] = model.LabelValue(project.Id)
+	labels[model.LabelName("environment_name")] = model.LabelValue(project.Name)
 
 	targetGroup := promconfig.TargetGroup{
 		Labels:  labels,
