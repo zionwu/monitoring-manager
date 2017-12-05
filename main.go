@@ -2,12 +2,15 @@ package main
 
 import (
 	"context"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/gorilla/handlers"
 	"github.com/urfave/cli"
+	"github.com/zionwu/monitoring-manager/api"
 	"github.com/zionwu/monitoring-manager/config"
 	"github.com/zionwu/monitoring-manager/sync"
 	"golang.org/x/sync/errgroup"
@@ -80,6 +83,12 @@ func main() {
 			EnvVar: "RANCHER_EXPORTRT_PORT",
 			Value:  "9173",
 		},
+		cli.StringFlag{
+			Name:   "listen_port, l",
+			Usage:  "listen port",
+			EnvVar: "LISTEN_PORT",
+			Value:  "8888",
+		},
 	}
 
 	app.Run(os.Args)
@@ -91,6 +100,12 @@ func run(c *cli.Context) error {
 	}
 
 	config.Init(c)
+
+	router := http.Handler(api.NewRouter(api.NewServer()))
+	router = handlers.LoggingHandler(os.Stdout, router)
+	router = handlers.ProxyHeaders(router)
+	logrus.Infof("Alertmanager operator running on %s", config.GetConfig().ListenPort)
+	go http.ListenAndServe(":"+config.GetConfig().ListenPort, router)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	wg, ctx := errgroup.WithContext(ctx)

@@ -1,3 +1,32 @@
+Release v1.12.40 (2017-12-04)
+===
+
+### Service Client Updates
+* `service/budgets`: Updates service API and documentation
+  * Add additional costTypes to support finer control for different charges included in a cost budget.
+* `service/ecs`: Updates service documentation
+  * Documentation updates for ecs
+
+Release v1.12.39 (2017-12-01)
+===
+
+### Service Client Updates
+* `service/SageMaker`: Updates service waiters
+
+Release v1.12.38 (2017-11-30)
+===
+
+### Service Client Updates
+* `service/AWSMoneypenny`: Adds new service
+* `service/Cloud9`: Adds new service
+* `service/Serverless Registry`: Adds new service
+* `service/apigateway`: Updates service API, documentation, and paginators
+  * Added support Private Integration and VPC Link features in API Gateway. This allows to create an API with the API Gateway private integration, thus providing clients access to HTTP/HTTPS resources in an Amazon VPC from outside of the VPC through a VpcLink resource.
+* `service/ec2`: Updates service API and documentation
+  * Adds the following updates: 1. Spread Placement ensures that instances are placed on distinct hardware in order to reduce correlated failures. 2. Inter-region VPC Peering allows customers to peer VPCs across different AWS regions without requiring additional gateways, VPN connections or physical hardware
+* `service/lambda`: Updates service API and documentation
+  * AWS Lambda now supports the ability to set the concurrency limits for individual functions, and increasing memory to 3008 MB.
+
 Release v1.12.37 (2017-11-30)
 ===
 

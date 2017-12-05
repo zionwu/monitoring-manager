@@ -4,9 +4,10 @@ import (
 	"io/ioutil"
 	"net/http"
 	"time"
-
 	"github.com/Sirupsen/logrus"
 )
+
+
 
 func ReloadConfiguration(url string) error {
 	//TODO: what is the wait time

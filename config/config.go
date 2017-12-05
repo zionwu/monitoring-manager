@@ -12,6 +12,7 @@ type Config struct {
 	NodeExporterPort    string
 	RancherExporterPort string
 	SyncIntervalSec     int
+	ListenPort          string
 }
 
 var config Config
@@ -26,6 +27,7 @@ func Init(c *cli.Context) {
 	config.CadvisorPort = c.String("cadvisor_port")
 	config.NodeExporterPort = c.String("node_exporter_port")
 	config.RancherExporterPort = c.String("rancher_exporter_port")
+	config.ListenPort = c.String("listen_port")
 }
 
 func GetConfig() Config {

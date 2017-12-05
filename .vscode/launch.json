@@ -15,7 +15,7 @@
             "host": "127.0.0.1",
             "program": "${fileDirname}",
             "env": {},
-            "args": ["-d","--cattle_secret_key","z8zcphbJquDYsWtgahEpw8XsXL6caJwMQumiusHo","--cattle_access_key","FFEC7D44D72FD3966BEB","--cattle_url","http://120.78.160.216:8080", "--prometheus_url","http://120.78.160.216:9090", "--prometheus_config", "/Users/wuziyang/Rancher/code/gopath/src/github.com/zionwu/monitoring-manager/prometheus.yml"],
+            "args": ["-d","--cattle_secret_key","z8zcphbJquDYsWtgahEpw8XsXL6caJwMQumiusHo","--cattle_access_key","FFEC7D44D72FD3966BEB","--cattle_url","http://127.0.0.1:8080", "--prometheus_url","http://120.78.160.216:9090", "--prometheus_config", "/Users/wuziyang/Rancher/code/gopath/src/github.com/zionwu/monitoring-manager/prometheus.yml"],
             "showLog": true
         }
     ]
