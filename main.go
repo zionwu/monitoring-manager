@@ -32,7 +32,7 @@ func main() {
 			EnvVar: "DEBUG",
 		},
 		cli.StringFlag{
-			Name:   "prometheus_url, p",
+			Name:   "prometheus_url",
 			Usage:  "Prometheus URL",
 			EnvVar: "PROMETHEUS_URL",
 			Value:  "http://prometheus:9090",
@@ -42,6 +42,24 @@ func main() {
 			Usage:  "Prometheus Config",
 			EnvVar: "PROMETHEUS_CONFIG",
 			Value:  "/etc/prometheus/prometheus.yml",
+		},
+		cli.StringFlag{
+			Name:   "prometheus_rule",
+			Usage:  "Prometheus Rule",
+			EnvVar: "PROMETHEUS_RULE",
+			Value:  "/etc/prometheus-rules/rancher.yaml",
+		},
+		cli.StringFlag{
+			Name:   "alertmanager_url",
+			Usage:  "AlertManager URL",
+			EnvVar: "ALERTMANAGER_URL",
+			Value:  "http://alertmanager:9093",
+		},
+		cli.StringFlag{
+			Name:   "alertmanager_config",
+			Usage:  "AlertManager Config",
+			EnvVar: "ALERTMANAGER_CONFIG",
+			Value:  "/etc/alertmanager/config.yml",
 		},
 		cli.IntFlag{
 			Name:   "sync_interval_sec, i",
@@ -101,7 +119,10 @@ func run(c *cli.Context) error {
 
 	config.Init(c)
 
-	router := http.Handler(api.NewRouter(api.NewServer()))
+	promChan := make(chan struct{}, 10)
+	alertChan := make(chan struct{}, 10)
+
+	router := http.Handler(api.NewRouter(api.NewServer(promChan, alertChan)))
 	router = handlers.LoggingHandler(os.Stdout, router)
 	router = handlers.ProxyHeaders(router)
 	logrus.Infof("Alertmanager operator running on %s", config.GetConfig().ListenPort)
@@ -111,6 +132,9 @@ func run(c *cli.Context) error {
 	wg, ctx := errgroup.WithContext(ctx)
 
 	wg.Go(func() error { return sync.NewPrometheusTargetSynchronizer().Run(ctx.Done()) })
+	wg.Go(func() error { return sync.NewAlertStateSynchronizer().Run(ctx.Done()) })
+	wg.Go(func() error { return sync.NewAlertRouteSynchronizer(alertChan).Run(ctx.Done()) })
+	wg.Go(func() error { return sync.NewPrometheusRuleSynchronizer(promChan).Run(ctx.Done()) })
 
 	term := make(chan os.Signal)
 	signal.Notify(term, os.Interrupt, syscall.SIGTERM)

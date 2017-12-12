@@ -3,16 +3,20 @@ package config
 import "github.com/urfave/cli"
 
 type Config struct {
-	CattleURL           string
-	CattleAccessKey     string
-	CattleSecretKey     string
-	PrometheusURL       string
-	PrometheusConfig    string
+	CattleURL        string
+	CattleAccessKey  string
+	CattleSecretKey  string
+	PrometheusURL    string
+	PrometheusConfig string
+	PrometheusRule   string
+
 	CadvisorPort        string
 	NodeExporterPort    string
 	RancherExporterPort string
 	SyncIntervalSec     int
 	ListenPort          string
+	AlertManagerURL     string
+	AlertManagerConfig  string
 }
 
 var config Config
@@ -23,6 +27,9 @@ func Init(c *cli.Context) {
 	config.CattleSecretKey = c.String("cattle_secret_key")
 	config.PrometheusURL = c.String("prometheus_url")
 	config.PrometheusConfig = c.String("prometheus_config")
+	config.PrometheusRule = c.String("prometheus_rule")
+	config.AlertManagerURL = c.String("alertmanager_url")
+	config.AlertManagerConfig = c.String("alertmanager_config")
 	config.SyncIntervalSec = c.Int("sync_interval_sec")
 	config.CadvisorPort = c.String("cadvisor_port")
 	config.NodeExporterPort = c.String("node_exporter_port")

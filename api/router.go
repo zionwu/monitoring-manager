@@ -7,6 +7,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/rancher/go-rancher/api"
 	"github.com/rancher/go-rancher/client"
+	"github.com/zionwu/monitoring-manager/model"
 )
 
 type HandleFuncWithError func(http.ResponseWriter, *http.Request) error
@@ -19,7 +20,7 @@ func handleError(s *client.Schemas, t func(http.ResponseWriter, *http.Request) (
 			rw.Header().Set("Content-Type", "application/json")
 			rw.WriteHeader(errorCode)
 
-			e := Error{
+			e := model.Error{
 				Resource: client.Resource{
 					Type: "error",
 				},
@@ -76,17 +77,15 @@ func NewRouter(s *Server) *mux.Router {
 		r.Methods(http.MethodPost).Path("/v1/configs").Queries("action", name).Handler(actions)
 	}
 
-	/*
-		alertActions := map[string]http.Handler{
-			"enable":    f(schemas, s.activateAlert),
-			"disable":   f(schemas, s.deactivateAlert),
-			"silence":   f(schemas, s.silenceAlert),
-			"unsilence": f(schemas, s.unsilenceAlert),
-		}
-		for name, actions := range alertActions {
-			r.Methods(http.MethodPost).Path("/v1/alerts/{id}").Queries("action", name).Handler(actions)
-		}
-	*/
+	alertActions := map[string]http.Handler{
+		"enable":    f(schemas, s.activateAlert),
+		"disable":   f(schemas, s.deactivateAlert),
+		"silence":   f(schemas, s.silenceAlert),
+		"unsilence": f(schemas, s.unsilenceAlert),
+	}
+	for name, actions := range alertActions {
+		r.Methods(http.MethodPost).Path("/v1/alerts/{id}").Queries("action", name).Handler(actions)
+	}
 
 	return r
 }

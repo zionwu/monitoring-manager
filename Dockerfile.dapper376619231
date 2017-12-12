@@ -1,0 +1,2 @@
+FROM monitoring-manager:master
+COPY . /go/src/github.com/zionwu/monitoring-manager/

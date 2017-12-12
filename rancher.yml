@@ -1,0 +1,41 @@
+groups:
+- name: rancher-rules
+  rules:
+  - alert: Test Pod memory
+    expr: rancher_host_agent_state{environment_id="default", id="memory-demo", state="active"}
+      != 1
+    for: 5m
+    labels:
+      alert_id: 4955d7aa-e5c9-4a83-be3c-c31eb22f077a
+      description: Test Pod memory
+      environment: default
+      severity: info
+      target_type: host
+  - alert: Test Pod memory
+    expr: rancher_host_agent_state{environment_id="default", id="memory-demo", state="active"}
+      != 1
+    for: 5m
+    labels:
+      alert_id: 41eeac6f-5f10-4252-b5df-b88ef247d446
+      description: Test Pod memory
+      environment: default
+      severity: info
+      target_type: host
+  - alert: Test Pod memory
+    expr: rancher_service_health_status{environment_id="default", id="1st111", health_state="healthy"}
+      != 1
+    labels:
+      alert_id: 2587b4a4-59da-495c-ae23-dd2d856f7384
+      description: Test Pod memory
+      environment: default
+      severity: info
+      target_type: service
+  - alert: Test Pod memory
+    expr: rancher_service_health_status{environment_id="default", id="1st111", health_state="healthy"}
+      != 1
+    labels:
+      alert_id: 039b2ce8-ae4c-4ead-9af3-053cb49338fb
+      description: Test Pod memory
+      environment: default
+      severity: info
+      target_type: service

@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 
@@ -9,25 +10,22 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/rancher/go-rancher/api"
 	"github.com/rancher/go-rancher/client"
-	v2client "github.com/rancher/go-rancher/v2"
-	"github.com/sluu99/uuid"
+	"github.com/zionwu/monitoring-manager/model"
+	"github.com/zionwu/monitoring-manager/service"
 )
 
 func (s *Server) listRecipient(rw http.ResponseWriter, req *http.Request) (errCode int, err error) {
 	apiContext := api.GetApiContext(req)
 
-	geObjList, err := s.paginateGenericObjects("recipient")
-	if err != nil {
-		logrus.Errorf("fail to list alertConfig,err:%v", err)
-		return http.StatusInternalServerError, err
+	var environment string
+	vals := req.URL.Query()
+	if nsarr, ok := vals["environment"]; ok {
+		environment = nsarr[0]
 	}
 
-	var recipients []*Recipient
-	for _, gobj := range geObjList {
-		b := []byte(gobj.ResourceData["data"].(string))
-		a := &Recipient{}
-		json.Unmarshal(b, a)
-		recipients = append(recipients, a)
+	recipients, err := service.ListRecipient(environment)
+	if err != nil {
+		return http.StatusInternalServerError, err
 	}
 
 	apiContext.Write(&client.GenericCollection{
@@ -40,61 +38,40 @@ func (s *Server) listRecipient(rw http.ResponseWriter, req *http.Request) (errCo
 
 func (s *Server) createRecipient(rw http.ResponseWriter, req *http.Request) (errCode int, err error) {
 	apiContext := api.GetApiContext(req)
-	data, err := ioutil.ReadAll(req.Body)
-	recipient := &Recipient{}
-	logrus.Debugf("start create recipient, get data:%v", string(data))
 
+	data, err := ioutil.ReadAll(req.Body)
+	recipient := &model.Recipient{}
+	logrus.Debugf("start create recipient, get data:%v", string(data))
 	if err := json.Unmarshal(data, recipient); err != nil {
 		return http.StatusInternalServerError, err
 	}
 
-	recipient.Id = uuid.Rand().Hex()
+	if err = s.checkRecipientParam(recipient); err != nil {
+		return http.StatusBadRequest, err
+	}
 
-	b, err := json.Marshal(*recipient)
+	err = service.CreateRecipient(recipient)
 	if err != nil {
 		return http.StatusInternalServerError, err
 	}
-	resourceData := map[string]interface{}{
-		"data": string(b),
-	}
 
-	_, err = s.rclient.GenericObject.Create(&v2client.GenericObject{
-		Name:         recipient.Id,
-		Key:          recipient.Id,
-		ResourceData: resourceData,
-		Kind:         "recipient",
-	})
-	if err != nil {
-		return http.StatusInternalServerError, err
-	}
+	go func() {
+		s.alertChan <- struct{}{}
+	}()
+
 	apiContext.Write(toRecipientResource(apiContext, recipient))
 	return http.StatusOK, nil
 
-}
-
-func (s *Server) getRecipientById(id string) (*Recipient, error) {
-	data, err := s.getGenericObjectById("recipient", id)
-	if err != nil {
-		return nil, err
-	}
-
-	recipient := &Recipient{}
-	err = json.Unmarshal([]byte(data.ResourceData["data"].(string)), recipient)
-	if err != nil {
-		return nil, err
-	}
-
-	return recipient, nil
 }
 
 func (s *Server) getRecipient(rw http.ResponseWriter, req *http.Request) (errCode int, err error) {
 	apiContext := api.GetApiContext(req)
 	id := mux.Vars(req)["id"]
 
-	recipient, err := s.getRecipientById(id)
+	recipient, err := service.GetRecipient(id)
 	if err != nil {
 		logrus.Errorf("Error while getting recipient", err)
-		return http.StatusInternalServerError, err
+		return http.StatusNotFound, err
 	}
 
 	apiContext.Write(toRecipientResource(apiContext, recipient))
@@ -106,21 +83,30 @@ func (s *Server) deleteRecipient(rw http.ResponseWriter, req *http.Request) (err
 	apiContext := api.GetApiContext(req)
 	id := mux.Vars(req)["id"]
 
-	data, err := s.getGenericObjectById("recipient", id)
+	recipient, err := service.GetRecipient(id)
 	if err != nil {
-		logrus.Errorf("Error while getting recipient", err)
-		return http.StatusInternalServerError, err
+		return http.StatusNotFound, err
 	}
 
-	if err = s.rclient.GenericObject.Delete(&data); err != nil {
-		return http.StatusInternalServerError, err
-	}
-
-	recipient := &Recipient{}
-	err = json.Unmarshal([]byte(data.ResourceData["data"].(string)), recipient)
+	//check if the recipient is used by any alert
+	alertList, err := service.ListAlert("")
 	if err != nil {
 		return http.StatusInternalServerError, err
 	}
+	for _, alert := range alertList {
+		if alert.RecipientID == recipient.Id {
+			return http.StatusBadRequest, fmt.Errorf("The recipient %s is still used for alert", id)
+		}
+	}
+
+	err = service.DeleteRecipient(id)
+	if err != nil {
+		return http.StatusInternalServerError, err
+	}
+
+	go func() {
+		s.alertChan <- struct{}{}
+	}()
 
 	apiContext.Write(toRecipientResource(apiContext, recipient))
 	return http.StatusOK, nil
@@ -131,33 +117,57 @@ func (s *Server) updateRecipient(rw http.ResponseWriter, req *http.Request) (err
 	apiContext := api.GetApiContext(req)
 	id := mux.Vars(req)["id"]
 
-	r, err := s.getGenericObjectById("recipient", id)
-	if err != nil {
-		logrus.Errorf("Error while getting recipient", err)
-		return http.StatusInternalServerError, err
-	}
-
-	recipient := &Recipient{}
+	recipient := &model.Recipient{}
 	data, err := ioutil.ReadAll(req.Body)
 	if err := json.Unmarshal(data, recipient); err != nil {
 		return http.StatusInternalServerError, err
 	}
 
-	b, err := json.Marshal(*recipient)
+	_, err = service.GetRecipient(id)
 	if err != nil {
-		return 0, err
-	}
-	resourceData := map[string]interface{}{
-		"data": string(b),
+		return http.StatusNotFound, err
 	}
 
-	_, err = s.rclient.GenericObject.Update(&r, &v2client.GenericObject{
-		Name:         id,
-		Key:          id,
-		ResourceData: resourceData,
-		Kind:         "recipient",
-	})
+	if err = s.checkRecipientParam(recipient); err != nil {
+		return http.StatusBadRequest, err
+	}
+	recipient.Id = id
+
+	service.UpdateRecipient(recipient)
+
+	go func() {
+		s.alertChan <- struct{}{}
+	}()
 
 	apiContext.Write(toRecipientResource(apiContext, recipient))
 	return http.StatusOK, nil
+}
+
+func (s *Server) checkRecipientParam(recipient *model.Recipient) error {
+
+	recipientType := recipient.RecipientType
+	if !(recipientType == "email" || recipientType == "webhook") {
+		return fmt.Errorf("recipientTpye should be email/webhook")
+	}
+
+	if recipient.Environment == "" {
+		return fmt.Errorf("missing environment")
+	}
+
+	switch recipientType {
+	case "email":
+		if recipient.EmailRecipient.Address == "" {
+			return fmt.Errorf("email address can't be empty")
+		}
+	case "webhook":
+		if recipient.WebhookRecipient.URL == "" {
+			return fmt.Errorf("webhook url can't be empty")
+		}
+
+		if recipient.WebhookRecipient.Name == "" {
+			return fmt.Errorf("webhook name can't be empty")
+		}
+	}
+
+	return nil
 }

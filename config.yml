@@ -1,0 +1,65 @@
+global:
+  resolve_timeout: 5h
+  smtp_from: abc
+  smtp_smarthost: 127.0.0.1
+  smtp_auth_username: abc
+  smtp_auth_password: abc
+  smtp_require_tls: false
+  slack_api_url: slack_api_url
+route:
+  receiver: rancherlabs
+  routes:
+  - match:
+      environment: default
+    routes:
+    - receiver: 1f4844d2-12d5-499e-a509-43ac1dcdacd5
+      match:
+        alert_id: 4955d7aa-e5c9-4a83-be3c-c31eb22f077a
+      group_wait: 30s
+      repeat_interval: 10m
+    - receiver: 40a1f850-37cd-4d9f-a8de-3cbd0d255fbe
+      match:
+        alert_id: 41eeac6f-5f10-4252-b5df-b88ef247d446
+      group_wait: 30s
+      repeat_interval: 1m
+    - receiver: 6713780d-a414-4d33-a892-85d0b7d4f5f7
+      match:
+        alert_id: 2587b4a4-59da-495c-ae23-dd2d856f7384
+      group_wait: 30s
+      repeat_interval: 1m
+    - receiver: 6713780d-a414-4d33-a892-85d0b7d4f5f7
+      match:
+        alert_id: 039b2ce8-ae4c-4ead-9af3-053cb49338fb
+      group_wait: 30s
+      repeat_interval: 1m
+  group_wait: 1m
+  group_interval: 0s
+  repeat_interval: 1h
+receivers:
+- name: rancherlabs
+  slack_configs:
+  - send_resolved: false
+    channel: '#alert'
+- name: 6713780d-a414-4d33-a892-85d0b7d4f5f7
+  webhook_configs:
+  - send_resolved: false
+    url: test.com
+- name: 1f4844d2-12d5-499e-a509-43ac1dcdacd5
+  email_configs:
+  - send_resolved: false
+    to: test@abc.com
+    headers:
+      Subject: 'Alert from Rancher: {{ (index .Alerts 0).Labels.description}}'
+- name: 40a1f850-37cd-4d9f-a8de-3cbd0d255fbe
+  email_configs:
+  - send_resolved: false
+    to: test123@abc.om
+    headers:
+      Subject: 'Alert from Rancher: {{ (index .Alerts 0).Labels.description}}'
+- name: 30e9e18a-b686-46ee-bf93-52b7e7430cd1
+  email_configs:
+  - send_resolved: false
+    to: zion@rancher.com
+    headers:
+      Subject: 'Alert from Rancher: {{ (index .Alerts 0).Labels.description}}'
+templates: []
