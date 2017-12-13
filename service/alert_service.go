@@ -128,6 +128,9 @@ func UpdateAlert(alert *model.Alert) error {
 		ResourceData: resourceData,
 		Kind:         "alert",
 	})
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
