@@ -36,7 +36,7 @@ func ReloadConfiguration(url string) error {
 
 func AddSilence(alert *model.Alert) error {
 
-	url := config.GetConfig().PrometheusURL
+	url := config.GetConfig().AlertManagerURL
 
 	matchers := []*prommodel.Matcher{}
 	m1 := &prommodel.Matcher{
@@ -88,7 +88,7 @@ func AddSilence(alert *model.Alert) error {
 
 func RemoveSilence(alert *model.Alert) error {
 
-	url := config.GetConfig().PrometheusURL
+	url := config.GetConfig().AlertManagerURL
 
 	res := struct {
 		Data   []*types.Silence `json:"data"`
