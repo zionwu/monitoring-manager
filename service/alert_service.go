@@ -2,7 +2,6 @@ package service
 
 import (
 	"encoding/json"
-	"fmt"
 
 	"github.com/Sirupsen/logrus"
 	v2client "github.com/rancher/go-rancher/v2"
@@ -89,10 +88,6 @@ func DeleteAlert(id string) error {
 	err = json.Unmarshal([]byte(data.ResourceData["data"].(string)), alert)
 	if err != nil {
 		return err
-	}
-
-	if alert.State != model.AlertStateDisabled {
-		return fmt.Errorf("Current state is not inactive, can not perform delete")
 	}
 
 	if err = rclient.GenericObject.Delete(&data); err != nil {
