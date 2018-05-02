@@ -3,7 +3,6 @@ package sync
 import (
 	"fmt"
 	"io/ioutil"
-	"strconv"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -12,7 +11,7 @@ import (
 	"github.com/rancher/go-rancher/v2"
 	"github.com/zionwu/monitoring-manager/config"
 	"github.com/zionwu/monitoring-manager/util"
-	yaml "gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v2"
 )
 
 const (
@@ -47,22 +46,56 @@ func (s *prometheusTargetSynchronizer) Run(stopc <-chan struct{}) error {
 			return nil
 
 		case <-tickChan:
-			projects, err := rclient.Project.List(&client.ListOpts{})
-			if err != nil {
-				logrus.Errorf("Error while listing projects: %s", err)
-				continue
-			}
-
+			// load config
 			promConfig, err := promconfig.LoadFile(c.PrometheusConfig)
 			if err != nil {
 				logrus.Errorf("Error while loading prometheus config: %s", err)
 				continue
 			}
 
-			cadvisorConfig := promconfig.ScrapeConfig{JobName: JobNameCadvisor}
-			nodeExporterConfig := promconfig.ScrapeConfig{JobName: JobNameNodeExporter}
-			rancherExporterConfig := promconfig.ScrapeConfig{JobName: JobNameRancherHealthExporter}
+			expectedScrapes := []*promconfig.ScrapeConfig{
+				{JobName: JobNameCadvisor},
+				{JobName: JobNameNodeExporter},
+				{JobName: JobNameRancherHealthExporter},
+			}
+			expectedScrapePorts := []string{
+				c.CadvisorPort,
+				c.NodeExporterPort,
+				c.RancherExporterPort,
+			}
+			actualScrapesUsed := [3]bool{}
 
+			// keep early scrape_configs:
+			for _, workedScrape := range promConfig.ScrapeConfigs {
+				switch workedScrape.JobName {
+				case JobNameCadvisor:
+					expectedScrapes[0] = workedScrape
+					actualScrapesUsed[0] = true
+				case JobNameNodeExporter:
+					expectedScrapes[1] = workedScrape
+					actualScrapesUsed[1] = true
+				case JobNameRancherHealthExporter:
+					expectedScrapes[2] = workedScrape
+					actualScrapesUsed[2] = true
+				}
+			}
+
+			// clean up <scrape_config>.static_configs
+			for idx, used := range actualScrapesUsed {
+				expectedScrapes[idx].ServiceDiscoveryConfig.StaticConfigs = nil
+
+				if !used {
+					promConfig.ScrapeConfigs = append(promConfig.ScrapeConfigs, expectedScrapes[idx])
+				}
+			}
+
+			projects, err := rclient.Project.List(&client.ListOpts{})
+			if err != nil {
+				logrus.Errorf("Error while listing projects: %s", err)
+				continue
+			}
+
+			// fill <scrape_config>.static_configs
 			for _, project := range projects.Data {
 				filter := map[string]interface{}{}
 				filter["projectId"] = project.Id
@@ -77,30 +110,41 @@ func (s *prometheusTargetSynchronizer) Run(stopc <-chan struct{}) error {
 					continue
 				}
 
-				addTargetToScrapeConfig(&cadvisorConfig, c.CadvisorPort, hosts, project, true)
-				addTargetToScrapeConfig(&nodeExporterConfig, c.NodeExporterPort, hosts, project, true)
-				addTargetToScrapeConfig(&rancherExporterConfig, c.RancherExporterPort, hosts, project, false)
+				for idx, scrape := range expectedScrapes {
+					var (
+						targets      []model.LabelSet
+						staticConfig *promconfig.TargetGroup
+					)
 
-			}
+					// each host will become a scraped endpoint
+					for _, host := range hosts.Data {
+						targets = append(targets, model.LabelSet{
+							model.AddressLabel: model.LabelValue(fmt.Sprintf("%s:%s", host.AgentIpAddress, expectedScrapePorts[idx])),
+						})
+					}
 
-			scrapeConfigs := []*promconfig.ScrapeConfig{}
-			scrapeConfigs = append(scrapeConfigs, &cadvisorConfig, &nodeExporterConfig, &rancherExporterConfig)
+					staticConfig = &promconfig.TargetGroup{
+						Targets: targets,
+						Labels: map[model.LabelName]model.LabelValue{
+							"environment_id":   model.LabelValue(project.Id),
+							"environment_name": model.LabelValue(project.Name),
+						},
+						Source: project.Id,
+					}
 
-			for _, scrapeConfig := range promConfig.ScrapeConfigs {
-				if scrapeConfig.JobName != JobNameCadvisor &&
-					scrapeConfig.JobName != JobNameNodeExporter &&
-					scrapeConfig.JobName != JobNameRancherHealthExporter {
-					scrapeConfigs = append(scrapeConfigs, scrapeConfig)
+					scrape.ServiceDiscoveryConfig.StaticConfigs = append(scrape.ServiceDiscoveryConfig.StaticConfigs, staticConfig)
 				}
+
 			}
 
-			promConfig.ScrapeConfigs = scrapeConfigs
-
+			// save config
 			configBytes, err := yaml.Marshal(promConfig)
-			logrus.Debugf("new generated config: %s", string(configBytes))
 			if err != nil {
 				logrus.Errorf("Error while marshal the config: %s", err)
 				continue
+			}
+			if logrus.GetLevel() >= logrus.DebugLevel {
+				logrus.Debugf("new generated config: %s", string(configBytes))
 			}
 
 			err = ioutil.WriteFile(c.PrometheusConfig, configBytes, 0777)
@@ -109,53 +153,11 @@ func (s *prometheusTargetSynchronizer) Run(stopc <-chan struct{}) error {
 				continue
 			}
 
+			// reload prometheus
 			util.ReloadConfiguration(c.PrometheusURL)
-
 		}
 	}
 
 	return nil
 }
 
-func addTargetToScrapeConfig(scrapeConfig *promconfig.ScrapeConfig, port string, hosts *client.HostCollection, project client.Project, global bool) {
-
-	if scrapeConfig.ServiceDiscoveryConfig.StaticConfigs == nil {
-		scrapeConfig.ServiceDiscoveryConfig.StaticConfigs = []*promconfig.TargetGroup{}
-	}
-	tgs := scrapeConfig.ServiceDiscoveryConfig.StaticConfigs
-
-	targets := []model.LabelSet{}
-
-	for _, host := range hosts.Data {
-		if global {
-			target := model.LabelSet{}
-			target[model.AddressLabel] = model.LabelValue(fmt.Sprintf("%s:%s", host.AgentIpAddress, port))
-			targets = append(targets, target)
-		} else {
-
-			for _, endpoint := range host.PublicEndpoints {
-				if strconv.FormatInt(endpoint.Port, 10) == port {
-					target := model.LabelSet{}
-					target[model.AddressLabel] = model.LabelValue(fmt.Sprintf("%s:%s", host.AgentIpAddress, port))
-					targets = append(targets, target)
-					break
-				}
-			}
-
-		}
-
-	}
-
-	labels := model.LabelSet{}
-	labels[model.LabelName("environment_id")] = model.LabelValue(project.Id)
-	labels[model.LabelName("environment_name")] = model.LabelValue(project.Name)
-
-	targetGroup := promconfig.TargetGroup{
-		Labels:  labels,
-		Targets: targets,
-	}
-	tgs = append(tgs, &targetGroup)
-
-	scrapeConfig.ServiceDiscoveryConfig.StaticConfigs = tgs
-
-}
